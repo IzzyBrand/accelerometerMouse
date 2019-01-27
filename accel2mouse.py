@@ -1,9 +1,9 @@
 import time
 import uinput
-from config import *
 from mpu6050 import mpu6050
 import numpy as np
 
+NUM_CALIBRATION_SAMPLES = 200
 
 if __name__ == '__main__':
     mpu = mpu6050(0x68)
@@ -20,6 +20,7 @@ if __name__ == '__main__':
         total += np.array([raw['x'], raw['y']])
 
     offset = total/NUM_CALIBRATION_SAMPLES
+    offset_alpha = 0.01
 
     print '[Calibrated] X: {}\tY: {}'.format(offset[0], offset[1])
 
@@ -34,12 +35,18 @@ if __name__ == '__main__':
 
         # read the accelerometer
         raw = mpu.get_accel_data()
-        accel = np.array([raw['x'], raw['y']]) - offset
+        accel = np.array([raw['x'], raw['y']])
+        offset = offset_alpha * accel + (1 - offset_alpha) * offset
+        accel -= offset
 
         # update the mouse velocity estimate
-        vel += accel * dt * MOUSE_SCALAR
-        vel *= 0.95 
-        print vel
+        vel += accel * dt
+        vel *= 0.999 
 
-        device.emit(uinput.REL_X, int(vel[1]))
-        device.emit(uinput.REL_Y, -int(vel[0]))
+        # get a command from the velocity
+        x_command = int(vel[1] * 50)
+        y_command =  int(vel[0] * 50)
+        print x_command, y_command
+
+        device.emit(uinput.REL_X, x_command)
+        device.emit(uinput.REL_Y, y_command)
